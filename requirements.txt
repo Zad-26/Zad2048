@@ -1,0 +1,3 @@
+# Zad 2048 - Python Dependencies
+kivy>=2.3.0
+pygame>=2.5.0
