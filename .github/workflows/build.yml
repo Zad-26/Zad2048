@@ -55,17 +55,17 @@ jobs:
           export ANDROIDNDK="/usr/local/lib/android/sdk/ndk/27.3.13750724"
           export ANDROIDAPI="33"
           export ANDROIDMINAPI="21"
-          for i in 1 2 3; do
-            yes | buildozer -v android debug 2>&1 && break
-            echo "Build attempt $i failed, retrying in 30 seconds..."
-            sleep 30
-          done
-
-      - name: Find APK
-        run: find . -name "*.apk" 2>/dev/null
+          yes | buildozer -v android debug 2>&1
+          echo "--- Searching for APK ---"
+          find . -name "*.apk" 2>/dev/null || echo "NO APK FOUND"
+          echo "--- bin/ directory ---"
+          ls -la bin/ 2>/dev/null || echo "bin/ does not exist"
+          echo "--- .buildozer/android/platform/build-arm64-v8a/dists ---"
+          find .buildozer -name "*.apk" 2>/dev/null || echo "No APK in .buildozer"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: zad2048-debug
           path: "**/*.apk"
+          if-no-files-found: error
