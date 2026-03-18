@@ -41,6 +41,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade buildozer cython==0.29.37
+          pip install python-for-android==2024.1.21
 
       - name: Cache buildozer global directory
         uses: actions/cache@v4
@@ -54,7 +55,12 @@ jobs:
           export ANDROIDNDK="/usr/local/lib/android/sdk/ndk/27.3.13750724"
           export ANDROIDAPI="33"
           export ANDROIDMINAPI="21"
-          yes | buildozer -v android debug 2>&1
+          # Retry up to 3 times in case of network failures
+          for i in 1 2 3; do
+            yes | buildozer -v android debug 2>&1 && break
+            echo "Build attempt $i failed, retrying in 30 seconds..."
+            sleep 30
+          done
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
