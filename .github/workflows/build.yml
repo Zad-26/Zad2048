@@ -29,7 +29,14 @@ jobs:
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
             "build-tools;34.0.0" \
             "platforms;android-33" \
-            "platform-tools"
+            "platform-tools" \
+            "tools"
+
+      - name: Fix sdkmanager path for buildozer
+        run: |
+          mkdir -p /usr/local/lib/android/sdk/tools/bin
+          ln -sf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            /usr/local/lib/android/sdk/tools/bin/sdkmanager
 
       - name: Install Python dependencies
         run: |
@@ -43,7 +50,6 @@ jobs:
 
       - name: Build APK
         run: |
-          # Point buildozer to the pre-installed SDK/NDK on the runner
           export ANDROIDSDK="/usr/local/lib/android/sdk"
           export ANDROIDNDK="/usr/local/lib/android/sdk/ndk/27.3.13750724"
           export ANDROIDAPI="33"
