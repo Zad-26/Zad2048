@@ -1,22 +1,25 @@
 name: Build APK
-on: [push, workflow_dispatch] # Triggers on ogni push or manual start
+on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # Specifying the OS version helps stability
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Build with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
+        # Using the latest master branch version which fixes the chown error
+        uses: ArtemSBulgakov/buildozer-action@master 
         id: buildozer
         with:
           command: buildozer android debug
           buildozer_version: stable
+          # This line below is the key fix for the "chown" error
+          repository_root: .
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: my-kivy-app
-          path: ${{ steps.buildozer.outputs.filename }}
+          name: Zad2048-APK
+          path: bin/*.apk
