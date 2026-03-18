@@ -55,15 +55,17 @@ jobs:
           export ANDROIDNDK="/usr/local/lib/android/sdk/ndk/27.3.13750724"
           export ANDROIDAPI="33"
           export ANDROIDMINAPI="21"
-          # Retry up to 3 times in case of network failures
           for i in 1 2 3; do
             yes | buildozer -v android debug 2>&1 && break
             echo "Build attempt $i failed, retrying in 30 seconds..."
             sleep 30
           done
 
+      - name: Find APK
+        run: find . -name "*.apk" 2>/dev/null
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: zad2048-debug
-          path: bin/*.apk
+          path: "**/*.apk"
