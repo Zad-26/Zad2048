@@ -16,14 +16,12 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            git zip unzip openjdk-17-jdk \
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            git zip unzip \
             libffi-dev libssl-dev \
             autoconf libtool pkg-config \
-            zlib1g-dev libncurses5-dev \
-            cmake libltdl-dev \
-            aidl
+            zlib1g-dev cmake
 
       - name: Accept Android SDK licenses
         run: |
