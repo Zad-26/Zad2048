@@ -18,6 +18,7 @@ android.sdk_path = /usr/local/lib/android/sdk
 android.ndk_path = /usr/local/lib/android/sdk/ndk/27.3.13750724
 android.ndk_version = 27
 p4a.bootstrap = sdl2
+p4a.branch = release-2024.01.21
 icon.filename = %(source.dir)s/assets/images/icon.png
 presplash.filename = %(source.dir)s/assets/images/icon.png
 android.presplash_color = #120832
