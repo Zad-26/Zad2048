@@ -42,6 +42,9 @@ jobs:
           key: buildozer-${{ hashFiles('buildozer.spec') }}
 
       - name: Build APK
+        env:
+          ANDROIDNDK: /usr/local/lib/android/sdk/ndk/27.3.13750724
+          ANDROIDAPI: "33"
         run: |
           yes | buildozer -v android debug 2>&1
 
