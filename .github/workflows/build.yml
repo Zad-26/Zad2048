@@ -42,10 +42,12 @@ jobs:
           key: buildozer-${{ hashFiles('buildozer.spec') }}
 
       - name: Build APK
-        env:
-          ANDROIDNDK: /usr/local/lib/android/sdk/ndk/27.3.13750724
-          ANDROIDAPI: "33"
         run: |
+          # Point buildozer to the pre-installed SDK/NDK on the runner
+          export ANDROIDSDK="/usr/local/lib/android/sdk"
+          export ANDROIDNDK="/usr/local/lib/android/sdk/ndk/27.3.13750724"
+          export ANDROIDAPI="33"
+          export ANDROIDMINAPI="21"
           yes | buildozer -v android debug 2>&1
 
       - name: Upload APK
