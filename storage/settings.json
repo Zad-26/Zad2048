@@ -1,9 +1,8 @@
 {
   "theme": "light",
   "sound_enabled": true,
-  "animations_enabled": false,
-  "bgm_enabled": false,
-  "sfx_volume": 1.0,
-  "bgm_volume": 0.18,
-  "best_score_cache": 828
+  "animations_enabled": true,
+  "bgm_enabled": true,
+  "sfx_volume": 0.5,
+  "bgm_volume": 0.5,
 }
