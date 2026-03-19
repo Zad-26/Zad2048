@@ -9,16 +9,23 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "ui"))
 
 from kivy.config import Config
-Config.set("graphics", "resizable", "1")
 Config.set("kivy", "exit_on_escape", "0")
-Config.set("input", "mouse", "mouse,multitouch_on_demand")
+
+# Only set fixed size on desktop (not Android)
+import os as _os
+_is_android = "ANDROID_ARGUMENT" in _os.environ
+
+if not _is_android:
+    Config.set("graphics", "resizable", "1")
+    Config.set("input", "mouse", "mouse,multitouch_on_demand")
 
 from kivy.app import App
 from kivy.uix.floatlayout import FloatLayout
 from kivy.clock import Clock
 from kivy.core.window import Window
 
-Window.size = (400, 720)
+if not _is_android:
+    Window.size = (400, 720)
 
 from menu_screen     import MenuScreen
 from game_screen     import GameScreen
