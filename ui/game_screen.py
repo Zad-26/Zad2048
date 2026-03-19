@@ -2,7 +2,7 @@
 Zad 2048 - Game Screen
 - Score-driven background color (dark + light mode)
 - Buttons centered
-- Sound effects + looping background music via Kivy SoundLoader
+- Sound effects + looping background music via pygame
 - Canvas-drawn tile text (no floating labels)
 """
 
@@ -93,8 +93,8 @@ def _get_theme_lerped(score, theme="dark"):
 
 class SoundManager:
     """
-    Manages sound effects AND background music via Kivy SoundLoader.
-    No pygame dependency — works natively on Android.
+    Manages sound effects AND background music via pygame.mixer.
+    BGM loops seamlessly using pygame's built-in loop=-1 feature.
     """
 
     SFX_FILES = {
@@ -110,36 +110,42 @@ class SoundManager:
         self.sfx_enabled = True
         self.bgm_enabled = True
         self._sfx        = {}
-        self._bgm        = None
-        self._bgm_vol    = 0.30
-        self._sfx_vol    = 0.70
+        self._bgm_loaded = False
+        self._pygame_ok  = False
         self._init()
 
     def _init(self):
-        from kivy.core.audio import SoundLoader
+        try:
+            import pygame
+            self._pygame = pygame
+            # Use a larger buffer to prevent audio glitches during BGM loop
+            pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=2048)
+            pygame.mixer.init()
+            self._pygame_ok = True
+            print(f"[Sound] pygame mixer ready: {pygame.mixer.get_init()}")
+        except Exception as e:
+            print(f"[Sound] pygame init failed: {e}")
+            return
 
         # Load SFX
         for key, fname in self.SFX_FILES.items():
             path = os.path.join(_SOUNDS_DIR, fname)
             if os.path.exists(path):
                 try:
-                    snd = SoundLoader.load(path)
-                    if snd:
-                        snd.volume = self._sfx_vol
-                        self._sfx[key] = snd
+                    self._sfx[key] = self._pygame.mixer.Sound(path)
+                    self._sfx[key].set_volume(0.70)
                 except Exception as e:
                     print(f"[Sound] Could not load {fname}: {e}")
         print(f"[Sound] {len(self._sfx)}/{len(self.SFX_FILES)} SFX loaded")
 
-        # Load BGM
+        # Load BGM into music channel (streams from disk, better for looping)
         bgm_path = os.path.join(_SOUNDS_DIR, self.BGM_FILE)
         if os.path.exists(bgm_path):
             try:
-                self._bgm = SoundLoader.load(bgm_path)
-                if self._bgm:
-                    self._bgm.volume = self._bgm_vol
-                    self._bgm.loop   = True
-                    print(f"[Sound] BGM loaded: {bgm_path}")
+                self._pygame.mixer.music.load(bgm_path)
+                self._pygame.mixer.music.set_volume(0.30)
+                self._bgm_loaded = True
+                print(f"[Sound] BGM loaded: {bgm_path}")
             except Exception as e:
                 print(f"[Sound] BGM load failed: {e}")
         else:
@@ -148,7 +154,7 @@ class SoundManager:
     # ── SFX ───────────────────────────────────────────────────────────────
 
     def play_sfx(self, key):
-        if not self.sfx_enabled:
+        if not self.sfx_enabled or not self._pygame_ok:
             return
         snd = self._sfx.get(key)
         if snd:
@@ -165,38 +171,36 @@ class SoundManager:
 
     def start_bgm(self):
         """Start looping background music."""
-        if not self._bgm or not self.bgm_enabled:
+        if not self._pygame_ok or not self._bgm_loaded or not self.bgm_enabled:
             return
         try:
-            if self._bgm.state != "play":
-                self._bgm.play()
+            self._pygame.mixer.music.play(loops=-1, fade_ms=1500)
             print("[Sound] BGM started")
         except Exception as e:
             print(f"[Sound] BGM start error: {e}")
 
     def stop_bgm(self):
-        """Stop background music."""
-        if not self._bgm:
+        """Stop background music with a fade."""
+        if not self._pygame_ok:
             return
         try:
-            self._bgm.stop()
+            self._pygame.mixer.music.fadeout(800)
         except Exception:
             pass
 
     def pause_bgm(self):
-        if not self._bgm:
+        if not self._pygame_ok:
             return
         try:
-            self._bgm.stop()
+            self._pygame.mixer.music.pause()
         except Exception:
             pass
 
     def resume_bgm(self):
-        if not self._bgm or not self.bgm_enabled:
+        if not self._pygame_ok or not self.bgm_enabled:
             return
         try:
-            if self._bgm.state != "play":
-                self._bgm.play()
+            self._pygame.mixer.music.unpause()
         except Exception:
             pass
 
@@ -204,18 +208,19 @@ class SoundManager:
         was_enabled = self.bgm_enabled
         self.bgm_enabled = bool(val)
         if self.bgm_enabled and not was_enabled:
+            # Only start if it was previously OFF (user toggled it ON)
             self.start_bgm()
         elif not self.bgm_enabled:
             self.stop_bgm()
 
     def set_bgm_volume(self, vol):
         """Set BGM volume 0.0 - 1.0."""
-        self._bgm_vol = max(0.0, min(1.0, vol))
-        if self._bgm:
-            try:
-                self._bgm.volume = self._bgm_vol
-            except Exception:
-                pass
+        if not self._pygame_ok:
+            return
+        try:
+            self._pygame.mixer.music.set_volume(max(0.0, min(1.0, vol)))
+        except Exception:
+            pass
 
     def reload_settings(self, storage):
         """Re-read sfx/bgm toggles from storage without restarting BGM."""
@@ -262,7 +267,19 @@ class TileWidget(Widget):
     def _make_texture(self):
         if self.value == 0:
             return None
-        fs = ColorManager.get_tile_font_size(self.value)
+        # Bigger font sizes based on tile size for better readability
+        tile_w = self.width if self.width > 0 else dp(80)
+        digits = len(str(self.value))
+        if digits <= 1:
+            fs = tile_w * 0.58
+        elif digits == 2:
+            fs = tile_w * 0.52
+        elif digits == 3:
+            fs = tile_w * 0.42
+        elif digits == 4:
+            fs = tile_w * 0.34
+        else:
+            fs = tile_w * 0.26
         lbl = CoreLabel(text=str(self.value), font_size=fs, bold=True)
         lbl.refresh()
         return lbl.texture
@@ -355,27 +372,31 @@ class ScoreBox(Widget):
 # ══════════════════════════════════════════════════════════════════════════
 
 SCORE_WORDS = [
-    (50,   "Nice!",        (0.70, 0.85, 1.00, 1)),
-    (100,  "Good!",        (0.60, 1.00, 0.75, 1)),
-    (200,  "Great!",       (1.00, 0.90, 0.30, 1)),
-    (300,  "Amazing!",     (1.00, 0.65, 0.20, 1)),
-    (400,  "Excellent!",   (1.00, 0.40, 0.40, 1)),
-    (500,  "Superb!",      (0.95, 0.30, 0.90, 1)),
-    (600,  "Fantastic!",   (0.40, 0.90, 1.00, 1)),
-    (700,  "Brilliant!",   (0.50, 1.00, 0.50, 1)),
-    (800,  "Incredible!",  (1.00, 0.80, 0.20, 1)),
-    (900,  "Unstoppable!", (1.00, 0.45, 0.20, 1)),
-    (1000, "Legendary!",   (1.00, 0.25, 0.50, 1)),
-    (1500, "GODLIKE!",     (1.00, 0.90, 0.10, 1)),
-    (2048, "2048 MASTER!", (1.00, 0.85, 0.20, 1)),
+    (4,    "Nice!",        (0.70, 0.85, 1.00, 1)),
+    (8,    "Good!",        (0.60, 1.00, 0.75, 1)),
+    (16,   "Great!",       (1.00, 0.90, 0.30, 1)),
+    (32,   "Amazing!",     (1.00, 0.65, 0.20, 1)),
+    (64,   "Excellent!",   (1.00, 0.40, 0.40, 1)),
+    (128,  "Superb!",      (0.95, 0.30, 0.90, 1)),
+    (256,  "Fantastic!",   (0.40, 0.90, 1.00, 1)),
+    (512,  "Brilliant!",   (0.50, 1.00, 0.50, 1)),
+    (1024, "Incredible!",  (1.00, 0.80, 0.20, 1)),
+    (2048, "Unstoppable!", (1.00, 0.45, 0.20, 1)),
+    (4096, "Legendary!",   (1.00, 0.25, 0.50, 1)),
+    (8192, "GODLIKE!",     (1.00, 0.90, 0.10, 1)),
 ]
 
 
 def _get_score_word(score, prev_score):
-    for threshold, word, color in reversed(SCORE_WORDS):
-        if prev_score < threshold <= score:
-            return word, color
-    return None, None
+    """Return word based on points gained in this single move."""
+    gained = score - prev_score
+    if gained <= 0:
+        return None, None
+    result_word, result_color = None, None
+    for threshold, word, color in SCORE_WORDS:
+        if gained >= threshold:
+            result_word, result_color = word, color
+    return result_word, result_color
 
 
 class ScorePopLabel(Widget):
@@ -960,14 +981,50 @@ class GameScreen(FloatLayout):
 
     def _on_home(self, btn):
         AnimationManager.button_press(btn)
+        # Save current game state so user can continue later
+        self._save_game_state()
         # Save stats including current moves before leaving
-        self._save_stats(self.logic.score, count_game=True)
-        # Snapshot moves so next game continues from here
+        self._save_stats(self.logic.score, count_game=False)
+        # Snapshot moves so next session continues from here
         stats = self.storage.get_stats()
         stats["_moves_base"] = stats.get("total_moves", 0)
         self.storage.save_stats(stats)
         Clock.schedule_once(
             lambda dt: self.on_home_callback() if hasattr(self, "on_home_callback") and self.on_home_callback else None, 0.18)
+
+    def _save_game_state(self):
+        """Save current board and score so the game can be resumed."""
+        try:
+            import json
+            state = {
+                "board": self.logic.board,
+                "score": self.logic.score,
+                "in_progress": True,
+            }
+            self.storage.set_setting("saved_game", json.dumps(state))
+        except Exception as e:
+            print(f"[Game] Failed to save game state: {e}")
+
+    def _load_game_state(self):
+        """Restore saved game state if one exists. Returns True if restored."""
+        try:
+            import json
+            raw = self.storage.get_setting("saved_game", None)
+            if not raw:
+                return False
+            state = json.loads(raw)
+            if not state.get("in_progress"):
+                return False
+            self.logic.board = state["board"]
+            self.logic.score = state["score"]
+            return True
+        except Exception as e:
+            print(f"[Game] Failed to load game state: {e}")
+            return False
+
+    def _clear_game_state(self):
+        """Clear saved game state (called on new game or game over)."""
+        self.storage.set_setting("saved_game", None)
 
     def _on_settings(self, btn):
         AnimationManager.button_press(btn)
@@ -975,6 +1032,7 @@ class GameScreen(FloatLayout):
             lambda dt: self.on_settings_callback() if self.on_settings_callback else None, 0.15)
 
     def _on_game_over(self, score):
+        self._clear_game_state()  # game ended — no resume
         self._save_stats(score)
         if self.on_game_over_callback:
             self.on_game_over_callback(score)
@@ -1001,12 +1059,13 @@ class GameScreen(FloatLayout):
         self.storage.save_stats(stats)
 
     def _start_new_game(self):
-        # Only count game if not already counted (e.g. game over already counted it)
+        # Count game only if not already counted
         if not self._game_counted:
             self._save_stats(self.logic.score, count_game=True)
         else:
             self._save_stats(self.logic.score, count_game=False)
         self._game_counted = False   # reset for next game
+        self._clear_game_state()     # wipe saved state — fresh start
         # Snapshot current total_moves as base for next game
         stats = self.storage.get_stats()
         stats["_moves_base"] = stats.get("total_moves", 0)
@@ -1039,6 +1098,14 @@ class GameScreen(FloatLayout):
         sm.bgm_enabled = bgm_on
         if not bgm_on:
             sm.stop_bgm()
+        # Restore saved game if one exists
+        if self._load_game_state():
+            self.board_widget._rebuild_board()
+            self.score_box.set_value(self.logic.score)
+            self.best_box.set_value(self.storage.get_best_score())
+            self._apply_score_theme(self.logic.score, animate=False)
+            self._prev_score = self.logic.score
+            print("[Game] Resumed saved game")
 
     def on_leave(self):
         get_sound_manager().pause_bgm()
