@@ -9,23 +9,16 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "ui"))
 
 from kivy.config import Config
+Config.set("graphics", "resizable", "1")
 Config.set("kivy", "exit_on_escape", "0")
-
-# Only set fixed size on desktop (not Android)
-import os as _os
-_is_android = "ANDROID_ARGUMENT" in _os.environ
-
-if not _is_android:
-    Config.set("graphics", "resizable", "1")
-    Config.set("input", "mouse", "mouse,multitouch_on_demand")
+Config.set("input", "mouse", "mouse,multitouch_on_demand")
 
 from kivy.app import App
 from kivy.uix.floatlayout import FloatLayout
 from kivy.clock import Clock
 from kivy.core.window import Window
 
-if not _is_android:
-    Window.size = (400, 720)
+Window.size = (400, 720)
 
 from menu_screen     import MenuScreen
 from game_screen     import GameScreen
@@ -225,8 +218,26 @@ class Zad2048App(App):
             self.icon = _icon
         return RootLayout()
 
+    def _save_game_if_active(self):
+        """Save game state if a game is currently in progress."""
+        try:
+            root = self.root
+            if root and root._game_screen:
+                gs = root._game_screen
+                if gs.logic and gs.logic.score >= 0:
+                    gs._save_game_state()
+                    print("[App] Game state saved on pause/stop")
+        except Exception as e:
+            print(f"[App] Could not save game state: {e}")
+
     def on_pause(self):
-        return True
+        # Called when app is backgrounded on Android
+        self._save_game_if_active()
+        return True  # Must return True to allow resume
+
+    def on_stop(self):
+        # Called when app is fully closed (swiped away from recents)
+        self._save_game_if_active()
 
     def on_resume(self):
         pass
