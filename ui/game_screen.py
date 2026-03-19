@@ -358,23 +358,37 @@ class ScoreBox(Widget):
 # ══════════════════════════════════════════════════════════════════════════
 
 SCORE_WORDS = [
-    (4,    "Nice!",        (0.70, 0.85, 1.00, 1)),
-    (8,    "Good!",        (0.60, 1.00, 0.75, 1)),
-    (16,   "Great!",       (1.00, 0.90, 0.30, 1)),
-    (32,   "Amazing!",     (1.00, 0.65, 0.20, 1)),
-    (64,   "Excellent!",   (1.00, 0.40, 0.40, 1)),
-    (128,  "Superb!",      (0.95, 0.30, 0.90, 1)),
-    (256,  "Fantastic!",   (0.40, 0.90, 1.00, 1)),
-    (512,  "Brilliant!",   (0.50, 1.00, 0.50, 1)),
-    (1024, "Incredible!",  (1.00, 0.80, 0.20, 1)),
-    (2048, "Unstoppable!", (1.00, 0.45, 0.20, 1)),
-    (4096, "Legendary!",   (1.00, 0.25, 0.50, 1)),
-    (8192, "GODLIKE!",     (1.00, 0.90, 0.10, 1)),
+    (4,     "Nice!",         (0.70, 0.85, 1.00, 1)),
+    (8,     "Good!",         (0.60, 1.00, 0.75, 1)),
+    (16,    "Great!",        (1.00, 0.90, 0.30, 1)),
+    (32,    "Amazing!",      (1.00, 0.65, 0.20, 1)),
+    (64,    "Excellent!",    (1.00, 0.40, 0.40, 1)),
+    (128,   "Superb!",       (0.95, 0.30, 0.90, 1)),
+    (256,   "Fantastic!",    (0.40, 0.90, 1.00, 1)),
+    (512,   "Brilliant!",    (0.50, 1.00, 0.50, 1)),
+    (1024,  "Incredible!",   (1.00, 0.80, 0.20, 1)),
+    (2048,  "Unstoppable!",  (1.00, 0.45, 0.20, 1)),
+    (4096,  "Legendary!",    (1.00, 0.25, 0.50, 1)),
+    (8192,  "GODLIKE!",      (1.00, 0.90, 0.10, 1)),
+    (16384, "TRANSCENDENT!", (0.20, 1.00, 0.90, 1)),
+    (32768, "OMNIPOTENT!",   (1.00, 0.20, 0.80, 1)),
+    (65536, "INFINITE!",     (0.90, 0.90, 0.10, 1)),
+]
+
+# Cycling colors for scores beyond the defined list
+_OVERFLOW_COLORS = [
+    (1.00, 0.20, 0.20, 1),
+    (0.20, 1.00, 0.20, 1),
+    (0.20, 0.20, 1.00, 1),
+    (1.00, 1.00, 0.20, 1),
+    (1.00, 0.20, 1.00, 1),
+    (0.20, 1.00, 1.00, 1),
 ]
 
 
 def _get_score_word(score, prev_score):
-    """Return word based on points gained in this single move."""
+    """Return word based on points gained in this single move.
+    Continues forever — cycles through INFINITE!/BEYOND!/etc for huge scores."""
     gained = score - prev_score
     if gained <= 0:
         return None, None
@@ -382,6 +396,16 @@ def _get_score_word(score, prev_score):
     for threshold, word, color in SCORE_WORDS:
         if gained >= threshold:
             result_word, result_color = word, color
+    # Beyond the defined list — generate dynamic words that never stop
+    if gained >= SCORE_WORDS[-1][0]:
+        import math
+        tier = int(math.log2(max(gained, 1))) - int(math.log2(SCORE_WORDS[-1][0]))
+        dynamic_words = [
+            "INFINITE!", "BEYOND!", "COSMIC!", "ETERNAL!", "DIVINE!",
+            "MYTHICAL!", "CELESTIAL!", "UNIVERSAL!", "IMMORTAL!", "ABSOLUTE!",
+        ]
+        result_word  = dynamic_words[tier % len(dynamic_words)]
+        result_color = _OVERFLOW_COLORS[tier % len(_OVERFLOW_COLORS)]
     return result_word, result_color
 
 
