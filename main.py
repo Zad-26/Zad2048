@@ -129,6 +129,9 @@ class RootLayout(FloatLayout):
     # ── Settings ───────────────────────────────────────────────────────────
 
     def _show_settings(self):
+        # Save game state before leaving so it can be restored on return
+        if self._game_screen:
+            self._game_screen._save_game_state()
         self._clear()
         s = SettingsScreen(
             on_back=self._on_settings_back,
