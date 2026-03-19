@@ -233,9 +233,15 @@ class Zad2048App(App):
             root = self.root
             if root and root._game_screen:
                 gs = root._game_screen
-                if gs.logic and gs.logic.score >= 0:
-                    gs._save_game_state()
-                    print("[App] Game state saved on pause/stop")
+                if gs.logic:
+                    # Only save if board actually has tiles (real game in progress)
+                    has_tiles = any(
+                        gs.logic.board[r][c] != 0
+                        for r in range(4) for c in range(4)
+                    )
+                    if has_tiles:
+                        gs._save_game_state()
+                        print("[App] Game state saved on pause/stop")
         except Exception as e:
             print(f"[App] Could not save game state: {e}")
 
