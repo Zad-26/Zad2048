@@ -117,13 +117,13 @@ class RootLayout(FloatLayout):
         self._show(self._game_screen)
         if hasattr(self._game_screen, "refresh_theme"):
             self._game_screen.refresh_theme()
-        if not is_new:
-            self._game_screen.on_enter()
+        # Always call on_enter — restores saved game whether new or returning
+        self._game_screen.on_enter()
 
     def _on_game_home(self):
-        """Home button in game → go back to menu."""
+        """Home button in game → go back to menu, keep game state."""
         self._clear()
-        self._game_screen = None  # reset game on returning to menu
+        # Do NOT set _game_screen to None — keep it so progress is preserved
         self._show_menu()
 
     # ── Settings ───────────────────────────────────────────────────────────
@@ -200,7 +200,7 @@ class RootLayout(FloatLayout):
 
     def _on_game_over_menu(self):
         self._remove_overlay()
-        self._game_screen = None
+        self._game_screen = None  # Game is over — fresh game next time
         self._clear()
         self._show_menu()
 
