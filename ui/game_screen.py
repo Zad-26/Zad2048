@@ -93,8 +93,8 @@ def _get_theme_lerped(score, theme="dark"):
 
 class SoundManager:
     """
-    Manages sound effects AND background music via pygame.mixer.
-    BGM loops seamlessly using pygame's built-in loop=-1 feature.
+    Manages sound effects AND background music via Kivy SoundLoader.
+    No pygame dependency — works natively on Android.
     """
 
     SFX_FILES = {
@@ -110,42 +110,32 @@ class SoundManager:
         self.sfx_enabled = True
         self.bgm_enabled = True
         self._sfx        = {}
-        self._bgm_loaded = False
-        self._pygame_ok  = False
+        self._bgm        = None
+        self._bgm_vol    = 0.30
+        self._sfx_vol    = 0.70
         self._init()
 
     def _init(self):
-        try:
-            import pygame
-            self._pygame = pygame
-            # Use a larger buffer to prevent audio glitches during BGM loop
-            pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=2048)
-            pygame.mixer.init()
-            self._pygame_ok = True
-            print(f"[Sound] pygame mixer ready: {pygame.mixer.get_init()}")
-        except Exception as e:
-            print(f"[Sound] pygame init failed: {e}")
-            return
-
-        # Load SFX
+        from kivy.core.audio import SoundLoader
         for key, fname in self.SFX_FILES.items():
             path = os.path.join(_SOUNDS_DIR, fname)
             if os.path.exists(path):
                 try:
-                    self._sfx[key] = self._pygame.mixer.Sound(path)
-                    self._sfx[key].set_volume(0.70)
+                    snd = SoundLoader.load(path)
+                    if snd:
+                        snd.volume = self._sfx_vol
+                        self._sfx[key] = snd
                 except Exception as e:
                     print(f"[Sound] Could not load {fname}: {e}")
         print(f"[Sound] {len(self._sfx)}/{len(self.SFX_FILES)} SFX loaded")
-
-        # Load BGM into music channel (streams from disk, better for looping)
         bgm_path = os.path.join(_SOUNDS_DIR, self.BGM_FILE)
         if os.path.exists(bgm_path):
             try:
-                self._pygame.mixer.music.load(bgm_path)
-                self._pygame.mixer.music.set_volume(0.30)
-                self._bgm_loaded = True
-                print(f"[Sound] BGM loaded: {bgm_path}")
+                self._bgm = SoundLoader.load(bgm_path)
+                if self._bgm:
+                    self._bgm.volume = self._bgm_vol
+                    self._bgm.loop   = True
+                    print(f"[Sound] BGM loaded: {bgm_path}")
             except Exception as e:
                 print(f"[Sound] BGM load failed: {e}")
         else:
@@ -154,7 +144,7 @@ class SoundManager:
     # ── SFX ───────────────────────────────────────────────────────────────
 
     def play_sfx(self, key):
-        if not self.sfx_enabled or not self._pygame_ok:
+        if not self.sfx_enabled:
             return
         snd = self._sfx.get(key)
         if snd:
@@ -170,37 +160,37 @@ class SoundManager:
     # ── BGM ───────────────────────────────────────────────────────────────
 
     def start_bgm(self):
-        """Start looping background music."""
-        if not self._pygame_ok or not self._bgm_loaded or not self.bgm_enabled:
+        if not self._bgm or not self.bgm_enabled:
             return
         try:
-            self._pygame.mixer.music.play(loops=-1, fade_ms=1500)
+            if self._bgm.state != "play":
+                self._bgm.play()
             print("[Sound] BGM started")
         except Exception as e:
             print(f"[Sound] BGM start error: {e}")
 
     def stop_bgm(self):
-        """Stop background music with a fade."""
-        if not self._pygame_ok:
+        if not self._bgm:
             return
         try:
-            self._pygame.mixer.music.fadeout(800)
+            self._bgm.stop()
         except Exception:
             pass
 
     def pause_bgm(self):
-        if not self._pygame_ok:
+        if not self._bgm:
             return
         try:
-            self._pygame.mixer.music.pause()
+            self._bgm.stop()
         except Exception:
             pass
 
     def resume_bgm(self):
-        if not self._pygame_ok or not self.bgm_enabled:
+        if not self._bgm or not self.bgm_enabled:
             return
         try:
-            self._pygame.mixer.music.unpause()
+            if self._bgm.state != "play":
+                self._bgm.play()
         except Exception:
             pass
 
@@ -208,22 +198,19 @@ class SoundManager:
         was_enabled = self.bgm_enabled
         self.bgm_enabled = bool(val)
         if self.bgm_enabled and not was_enabled:
-            # Only start if it was previously OFF (user toggled it ON)
             self.start_bgm()
         elif not self.bgm_enabled:
             self.stop_bgm()
 
     def set_bgm_volume(self, vol):
-        """Set BGM volume 0.0 - 1.0."""
-        if not self._pygame_ok:
-            return
-        try:
-            self._pygame.mixer.music.set_volume(max(0.0, min(1.0, vol)))
-        except Exception:
-            pass
+        self._bgm_vol = max(0.0, min(1.0, vol))
+        if self._bgm:
+            try:
+                self._bgm.volume = self._bgm_vol
+            except Exception:
+                pass
 
     def reload_settings(self, storage):
-        """Re-read sfx/bgm toggles from storage without restarting BGM."""
         self.set_sfx_enabled(storage.get_setting("sound_enabled", True))
         bgm_on = storage.get_setting("bgm_enabled", True)
         self.bgm_enabled = bool(bgm_on)
@@ -267,7 +254,6 @@ class TileWidget(Widget):
     def _make_texture(self):
         if self.value == 0:
             return None
-        # Bigger font sizes based on tile size for better readability
         tile_w = self.width if self.width > 0 else dp(80)
         digits = len(str(self.value))
         if digits <= 1:
@@ -981,11 +967,8 @@ class GameScreen(FloatLayout):
 
     def _on_home(self, btn):
         AnimationManager.button_press(btn)
-        # Save current game state so user can continue later
         self._save_game_state()
-        # Save stats including current moves before leaving
         self._save_stats(self.logic.score, count_game=False)
-        # Snapshot moves so next session continues from here
         stats = self.storage.get_stats()
         stats["_moves_base"] = stats.get("total_moves", 0)
         self.storage.save_stats(stats)
@@ -1032,7 +1015,7 @@ class GameScreen(FloatLayout):
             lambda dt: self.on_settings_callback() if self.on_settings_callback else None, 0.15)
 
     def _on_game_over(self, score):
-        self._clear_game_state()  # game ended — no resume
+        self._clear_game_state()
         self._save_stats(score)
         if self.on_game_over_callback:
             self.on_game_over_callback(score)
@@ -1059,14 +1042,12 @@ class GameScreen(FloatLayout):
         self.storage.save_stats(stats)
 
     def _start_new_game(self):
-        # Count game only if not already counted
         if not self._game_counted:
             self._save_stats(self.logic.score, count_game=True)
         else:
             self._save_stats(self.logic.score, count_game=False)
-        self._game_counted = False   # reset for next game
-        self._clear_game_state()     # wipe saved state — fresh start
-        # Snapshot current total_moves as base for next game
+        self._game_counted = False
+        self._clear_game_state()
         stats = self.storage.get_stats()
         stats["_moves_base"] = stats.get("total_moves", 0)
         self.storage.save_stats(stats)
