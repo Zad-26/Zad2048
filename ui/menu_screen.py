@@ -47,11 +47,9 @@ class MenuScreen(FloatLayout):
         self._build()
 
     def _build(self):
-        # Accent and text colours chosen to stand out on both bg variants
-        ac   = (0.42, 0.08, 0.75, 1)   # deep purple — readable on light bg
-        sc   = (0.35, 0.22, 0.62, 1)   # muted purple tagline
+        ac   = (0.42, 0.08, 0.75, 1)
+        sc   = (0.35, 0.22, 0.62, 1)
 
-        # ── Logo ──────────────────────────────────────────────────────────
         self.logo = KivyImage(
             source=os.path.join(_IMG, "icon.png"),
             fit_mode="contain",
@@ -60,7 +58,6 @@ class MenuScreen(FloatLayout):
         )
         self.add_widget(self.logo)
 
-        # ── Title ──────────────────────────────────────────────────────────
         self.title_lbl = Label(
             text="Zad 2048",
             font_size="38sp", bold=True, color=ac,
@@ -70,7 +67,6 @@ class MenuScreen(FloatLayout):
         )
         self.add_widget(self.title_lbl)
 
-        # ── Tagline ────────────────────────────────────────────────────────
         self.tag_lbl = Label(
             text="The Ultimate Puzzle",
             font_size="16sp", color=sc,
@@ -80,7 +76,6 @@ class MenuScreen(FloatLayout):
         )
         self.add_widget(self.tag_lbl)
 
-        # ── Buttons ────────────────────────────────────────────────────────
         self.play_btn = Button(
             text="Play",
             font_size="22sp", bold=True,
@@ -120,9 +115,7 @@ class MenuScreen(FloatLayout):
         btn_gap   = dp(14)
         btn_h1    = dp(58)
         btn_h2    = dp(50)
-        total_btn = btn_h1 + btn_h2 * 2 + btn_gap * 2
 
-        # Buttons sit in the bottom 38% of the screen
         btn_top_y  = py + h * 0.38
         play_y     = btn_top_y - btn_h1
         about_y    = play_y - btn_h2 - btn_gap
@@ -140,16 +133,13 @@ class MenuScreen(FloatLayout):
         self.quit_btn.center_x = cx
         self.quit_btn.y        = quit_y
 
-        # Logo — top area, 8% padding from top
         logo_h = dp(110)
         self.logo.size     = (logo_h, logo_h)
         self.logo.center_x = cx
         self.logo.y        = py + h * 0.92 - logo_h
 
-        # Space between bottom of logo and top of Play button
         space_between = play_y - (self.logo.y + logo_h)
 
-        # Place title + tagline in the CENTER of that space
         title_h = dp(54)
         tag_h   = dp(30)
         block_h = title_h + dp(8) + tag_h
@@ -200,7 +190,16 @@ class MenuScreen(FloatLayout):
 
     def _on_quit(self, btn):
         AnimationManager.button_press(btn)
-        Clock.schedule_once(lambda dt: App.get_running_app().stop(), 0.25)
+        # Save game state before quitting so progress is not lost
+        def _quit(dt):
+            try:
+                app = App.get_running_app()
+                if app and hasattr(app, '_save_game_if_active'):
+                    app._save_game_if_active()
+            except Exception:
+                pass
+            App.get_running_app().stop()
+        Clock.schedule_once(_quit, 0.25)
 
     def on_leave(self):
         pass
