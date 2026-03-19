@@ -1079,14 +1079,25 @@ class GameScreen(FloatLayout):
         sm.bgm_enabled = bgm_on
         if not bgm_on:
             sm.stop_bgm()
-        # Restore saved game if one exists
-        if self._load_game_state():
+        # Only restore from storage if there is no active game in memory
+        # (i.e. board is empty — fresh start or first launch)
+        board_empty = all(
+            self.logic.board[r][c] == 0
+            for r in range(4) for c in range(4)
+        )
+        if board_empty and self._load_game_state():
             self.board_widget._rebuild_board()
             self.score_box.set_value(self.logic.score)
             self.best_box.set_value(self.storage.get_best_score())
             self._apply_score_theme(self.logic.score, animate=False)
             self._prev_score = self.logic.score
             print("[Game] Resumed saved game")
+        elif not board_empty:
+            # Game already in memory — just refresh visuals
+            self.board_widget._rebuild_board()
+            self.score_box.set_value(self.logic.score)
+            self.best_box.set_value(self.storage.get_best_score())
+            self._apply_score_theme(self.logic.score, animate=False)
 
     def on_leave(self):
         get_sound_manager().pause_bgm()
