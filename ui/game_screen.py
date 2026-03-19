@@ -784,7 +784,8 @@ class GameScreen(FloatLayout):
         self._bg_color_instr = None
         self._bg_rect        = None
         self._prev_score     = 0
-        self._game_counted  = False  # prevent double-counting games
+        self._game_counted   = False  # prevent double-counting games
+        self._game_restored  = False  # flag: has saved game been loaded yet
         # Ensure _moves_base is initialised in storage
         Clock.schedule_once(self._init_moves_base, 0)
         self._setup_ui()
@@ -1070,7 +1071,8 @@ class GameScreen(FloatLayout):
             self._save_stats(self.logic.score, count_game=True)
         else:
             self._save_stats(self.logic.score, count_game=False)
-        self._game_counted = False
+        self._game_counted  = False
+        self._game_restored = True  # new game — don't try to load saved state
         self._clear_game_state()
         stats = self.storage.get_stats()
         stats["_moves_base"] = stats.get("total_moves", 0)
@@ -1103,21 +1105,21 @@ class GameScreen(FloatLayout):
         sm.bgm_enabled = bgm_on
         if not bgm_on:
             sm.stop_bgm()
-        # Only restore from storage if there is no active game in memory
-        # (i.e. board is empty — fresh start or first launch)
-        board_empty = all(
-            self.logic.board[r][c] == 0
-            for r in range(4) for c in range(4)
-        )
-        if board_empty and self._load_game_state():
-            self.board_widget._rebuild_board()
-            self.score_box.set_value(self.logic.score)
-            self.best_box.set_value(self.storage.get_best_score())
-            self._apply_score_theme(self.logic.score, animate=False)
-            self._prev_score = self.logic.score
-            print("[Game] Resumed saved game")
-        elif not board_empty:
-            # Game already in memory — just refresh visuals
+        if not self._game_restored:
+            # First time entering — try to restore saved game from storage
+            if self._load_game_state():
+                self._game_restored = True
+                self.board_widget._rebuild_board()
+                self.score_box.set_value(self.logic.score)
+                self.best_box.set_value(self.storage.get_best_score())
+                self._apply_score_theme(self.logic.score, animate=False)
+                self._prev_score = self.logic.score
+                print("[Game] Resumed saved game")
+            else:
+                # No saved game — mark as restored so we never try again
+                self._game_restored = True
+        else:
+            # Returning from settings/home — game already in memory, just refresh
             self.board_widget._rebuild_board()
             self.score_box.set_value(self.logic.score)
             self.best_box.set_value(self.storage.get_best_score())
